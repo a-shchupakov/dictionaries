@@ -4,12 +4,10 @@ import glob
 import os
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--directory', type=str, help='Analyze all txt''s in directory')
-
-args = parser.parse_args()
-
-directory = args.directory
+def create_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--directory', type=str, help='Analyze all txt''s in directory')
+    return parser
 
 
 def analyze_file(file_to_analyze, file_to_save):
@@ -19,9 +17,6 @@ def analyze_file(file_to_analyze, file_to_save):
     :param file_to_save: Файл, в который будет записана статистика
     :return:
     """
-    if '.txt' in file_to_save:
-        print('Do not rip analyzed data')
-        exit()
     with open(file_to_analyze, 'r', newline='') as data:
         with open(file_to_save, 'w', newline='') as file:
             writer = csv.writer(file)
@@ -44,16 +39,21 @@ def extract_list(line):
 def analyze_directory(directory_):
     for filename in glob.glob(os.path.join(directory_, '*.txt')):
         to_save = filename.replace('raw_results', 'final_results')
-        index = filename.rfind('\\')
-        to_save = (to_save[:index+1] + to_save[index+1:])[:-3] + 'csv'
+        to_save = to_save[:-3] + 'csv'
         save_dir = os.path.dirname(to_save)
+        save_dir = os.path.normpath(save_dir)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        print('Saved to: ' + save_dir)
         analyze_file(file_to_analyze=filename, file_to_save=to_save)
+        print('Saved to: ' + save_dir)
 
 
 def main():
+    parser = create_parser()
+    args = parser.parse_args()
+
+    directory = args.directory
+
     analyze_directory(directory)
 
 
