@@ -8,59 +8,92 @@ from random import shuffle
 from dictionaries import *
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-s', '--summary', type=int)
-parser.add_argument('-r', '--repeats', type=int)
-parser.add_argument('--step', type=int)
-parser.add_argument('--data_path', type=str, help='Data to test')
-parser.add_argument('--save_path', type=str, help='Dir to save')
+SUMMARY, REPEATS, STEP = [None] * 3
 
-parser.add_argument('--d1', action='store_true', help='Test built-in dict')
-parser.add_argument('--d2', action='store_true', help='Test hash hand-made dict')
-parser.add_argument('--d3', action='store_true', help='Test AVL tree dict')
-parser.add_argument('--d4', action='store_true', help='Test binary tree dict')
-parser.add_argument('--d5', action='store_true', help='Test linear-search dict')
-parser.add_argument('--d6', action='store_true', help='Test binary-search dict')
+WARM_UP_SUMMARY, WARM_UP_REPEATS, WARM_UP_STEP = 1000, 5, 200
 
-parser.add_argument('--test_hash', action='store_true', help='Test hash dict with different options')
+DATA_PATH, SAVE_PATH = [None] * 2
 
-parser.add_argument('-a', '--add', action='store_true', help='Test add method')
-parser.add_argument('-g', '--get', action='store_true', help='Test get method')
+RAW_RESULTS = 'raw_results'
 
-args_ = parser.parse_args()
+CURRENT_ADD_SAVE_PATH, CURRENT_GET_SAVE_PATH = [None] * 2
 
-SUMMARY = args_.summary
-REPEATS = args_.repeats
-STEP = args_.step
-DATA_PATH = args_.data_path
-SAVE_PATH = args_.save_path
+d1, d2, d3, d4, d5, d6 = [None] * 6
 
-if not SUMMARY or not REPEATS or not STEP:
-    print('Wrong test definition')
-    exit()
+TEST_HASH = None
 
-if not DATA_PATH:
-    print('No data to test were given')
-    exit()
+ADD, GET = [None] * 2
 
-if not SAVE_PATH:
-    print('Please select directory for the results')
-    exit()
 
-CURRENT_ADD_SAVE_PATH = SAVE_PATH + '/add/' + 's={},r={},step={}/'.format(SUMMARY, REPEATS, STEP)
-CURRENT_GET_SAVE_PATH = SAVE_PATH + '/get/' + 's={},r={},step={}/'.format(SUMMARY, REPEATS, STEP)
+def create_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--summary', type=int)
+    parser.add_argument('-r', '--repeats', type=int)
+    parser.add_argument('--step', type=int)
+    parser.add_argument('--data_path', type=str, help='Data to test')
+    parser.add_argument('--save_path', type=str, help='Dir to save')
 
-d1 = args_.d1
-d2 = args_.d2
-d3 = args_.d3
-d4 = args_.d4
-d5 = args_.d5
-d6 = args_.d6
+    parser.add_argument('--d1', action='store_true', help='Test built-in dict')
+    parser.add_argument('--d2', action='store_true', help='Test hash hand-made dict')
+    parser.add_argument('--d3', action='store_true', help='Test AVL tree dict')
+    parser.add_argument('--d4', action='store_true', help='Test binary tree dict')
+    parser.add_argument('--d5', action='store_true', help='Test linear-search dict')
+    parser.add_argument('--d6', action='store_true', help='Test binary-search dict')
 
-TEST_HASH = args_.test_hash
+    parser.add_argument('--test_hash', action='store_true', help='Test hash dict with different options')
 
-ADD = args_.add
-GET = args_.get
+    parser.add_argument('-a', '--add', action='store_true', help='Test add method')
+    parser.add_argument('-g', '--get', action='store_true', help='Test get method')
+
+    return parser
+
+
+def parse_arguments(parser):
+    args_ = parser.parse_args()
+    global SUMMARY, REPEATS, STEP,\
+        DATA_PATH, SAVE_PATH,\
+        CURRENT_ADD_SAVE_PATH, CURRENT_GET_SAVE_PATH, \
+        d1, d2, d3, d4, d5, d6, TEST_HASH, ADD, GET
+
+    SUMMARY = args_.summary
+    REPEATS = args_.repeats
+    STEP = args_.step
+    DATA_PATH = args_.data_path
+    SAVE_PATH = args_.save_path
+
+    CURRENT_ADD_SAVE_PATH = os.path.join(SAVE_PATH, RAW_RESULTS,
+                                         'add', 's={},r={},step={}/'.format(SUMMARY, REPEATS, STEP))
+    CURRENT_GET_SAVE_PATH = os.path.join(SAVE_PATH, RAW_RESULTS,
+                                         'get', 's={},r={},step={}/'.format(SUMMARY, REPEATS, STEP))
+
+    CURRENT_ADD_SAVE_PATH = os.path.normpath(CURRENT_ADD_SAVE_PATH)
+    CURRENT_GET_SAVE_PATH = os.path.normpath(CURRENT_GET_SAVE_PATH)
+
+    d1 = args_.d1
+    d2 = args_.d2
+    d3 = args_.d3
+    d4 = args_.d4
+    d5 = args_.d5
+    d6 = args_.d6
+
+    TEST_HASH = args_.test_hash
+
+    ADD = args_.add
+    GET = args_.get
+
+
+def check_variables():
+    if not SUMMARY or not REPEATS or not STEP:
+        print('Wrong test definition')
+        exit()
+
+    if not os.path.isfile(str(DATA_PATH)):
+        print('No data to test were given')
+        exit()
+
+    if not os.path.isdir(str(SAVE_PATH)):
+        print('Please select correct directory for the results')
+        exit()
 
 
 def measure(func):
@@ -94,8 +127,8 @@ def import_data(path, count):
 
 
 def fill_the_dict(dict_to_measure, data_path, to_add, repeats, file_to_save,
-                  dict_creating_args=tuple(),
-                  dict_creating_kwargs=dict()):
+                  dict_creating_args=None,
+                  dict_creating_kwargs=None):
     """
     В заданный словарь добавляет заданное количество элементов заданное количество раз
     :param dict_to_measure: Тестируемый словарь
@@ -107,6 +140,10 @@ def fill_the_dict(dict_to_measure, data_path, to_add, repeats, file_to_save,
     :param dict_creating_kwargs: Именнованные аргументы для конструктора словаря
     :return:
     """
+    if not dict_creating_args:
+        dict_creating_args = tuple()
+    if not dict_creating_kwargs:
+        dict_creating_kwargs = dict()
     data = import_data(data_path, to_add)
     results = []
     for _ in range(0, repeats):
@@ -118,8 +155,8 @@ def fill_the_dict(dict_to_measure, data_path, to_add, repeats, file_to_save,
 
 
 def extract_the_keys(dict_to_measure, data_path, to_add, repeats, file_to_save,
-                     dict_creating_args=tuple(),
-                     dict_creating_kwargs=dict()):
+                     dict_creating_args=None,
+                     dict_creating_kwargs=None):
     """
     Извлекает все ключи из словаря, предварительно добавив их в него (все ключи гарантированно находятся в словаре)
     :param dict_to_measure: Тестируемый словарь
@@ -131,6 +168,10 @@ def extract_the_keys(dict_to_measure, data_path, to_add, repeats, file_to_save,
     :param dict_creating_kwargs: Именнованные аргументы для конструктора словаря
     :return:
     """
+    if not dict_creating_args:
+        dict_creating_args = tuple()
+    if not dict_creating_kwargs:
+        dict_creating_kwargs = dict()
     data = import_data(data_path, to_add)
     results = []
     new_dict = dict_to_measure(*dict_creating_args, **dict_creating_kwargs)
@@ -160,7 +201,7 @@ def get_from_dict(dict_, data):
 
 def test_dict_method(dict_to_measure, data_path, dir_to_save, summary, repeats, step,
                      test_method=None, is_warm_up=False, note='',
-                     dict_creating_args=tuple(), dict_creating_kwargs=dict()):
+                     dict_creating_args=None, dict_creating_kwargs=None):
     """
     Тестирует заданный словарь:
         Здесь происходит вызов метода test_method с увеличением добавлямых элементов на заданный шаг
@@ -181,7 +222,8 @@ def test_dict_method(dict_to_measure, data_path, dir_to_save, summary, repeats, 
     if not is_warm_up:
         time = datetime.datetime.now()
         print('Testing {} on '.format(test_method.__name__) + dict_to_measure.__name__ + ' : ' + str(time))
-        file_name = dir_to_save + dict_to_measure.__name__ + '.txt'
+        file_name = os.path.join(dir_to_save, dict_to_measure.__name__ + '.txt')
+        file_name = os.path.normpath(file_name)
     if note:
         file_name = file_name[:-4] + '_{}'.format(note) + '.txt'
 
@@ -201,9 +243,11 @@ def test_dict_method(dict_to_measure, data_path, dir_to_save, summary, repeats, 
 
 def back_up_previous_results(directory_):
     for file in glob.glob(os.path.join(directory_, '*.txt')):
-        index = file.rfind('/')
-        to_add = 'previous_back_up/'
-        dst = file[:index+1] + to_add + file[index+1:]
+        file = os.path.normpath(file)
+        to_add = 'previous_back_up'
+        dst = os.path.join(SAVE_PATH, RAW_RESULTS, to_add,
+                           *(file[file.find(RAW_RESULTS)+len(RAW_RESULTS):]).split('\\'))
+        dst = os.path.normpath(dst)
         create_missing_directory(dst)
         copy2(file, dst)
 
@@ -214,7 +258,7 @@ def create_missing_directory(path_):
         os.makedirs(save_dir)
 
 
-def warm_up(dictionary, times=5, dict_creating_args=tuple(), dict_creating_kwargs=dict()):
+def warm_up(dictionary, times=5, dict_creating_args=None, dict_creating_kwargs=None):
     """
     "Прогревочный" запуск тестируемых методов
     :param dictionary: Тестируемый словарь
@@ -226,11 +270,13 @@ def warm_up(dictionary, times=5, dict_creating_args=tuple(), dict_creating_kwarg
     print('Warm up on ' + dictionary.__name__)
     if ADD:
         for _ in range(0, times):
-            test_dict_method(dictionary, DATA_PATH, None, 1000, 5, 200, test_method=fill_the_dict, is_warm_up=True,
+            test_dict_method(dictionary, DATA_PATH, None, WARM_UP_SUMMARY, WARM_UP_REPEATS, WARM_UP_STEP,
+                             test_method=fill_the_dict, is_warm_up=True,
                              dict_creating_args=dict_creating_args, dict_creating_kwargs=dict_creating_kwargs)
     if GET:
         for _ in range(0, times):
-            test_dict_method(dictionary, DATA_PATH, None, 1000, 5, 200, test_method=extract_the_keys, is_warm_up=True,
+            test_dict_method(dictionary, DATA_PATH, None,  WARM_UP_SUMMARY, WARM_UP_REPEATS, WARM_UP_STEP,
+                             test_method=extract_the_keys, is_warm_up=True,
                              dict_creating_args=dict_creating_args, dict_creating_kwargs=dict_creating_kwargs)
     print('End of warm up')
 
@@ -257,21 +303,30 @@ def test_selected_dicts():
 
 def test_hash_dict():
     """Тестирует производительность хэш-таблицы с различными настройками"""
-    test_dict(HashDict, note='standard', dict_creating_kwargs={'load_factor': 0.72,
-                                                               'hash_function': hash,
-                                                               'prime_ext': False})
 
-    # test_dict(HashDict, note='bad_hash', dict_creating_kwargs={'load_factor': 0.72,
-    #                                                           'hash_function': lambda x: len(str(x)),
-    #                                                           'prime_ext': False})
+    test_dict(HashDict, note='26load_factor', dict_creating_kwargs={'load_factor': 0.26,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
 
-    # test_dict(HashDict, note='const_hash', dict_creating_kwargs={'load_factor': 0.72,
-    #                                                             'hash_function': lambda x: 1,
-    #                                                             'prime_ext': False})
+    test_dict(HashDict, note='40load_factor', dict_creating_kwargs={'load_factor': 0.4,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
 
-    test_dict(HashDict, note='low_load_factor', dict_creating_kwargs={'load_factor': 0.4,
-                                                                      'hash_function': hash,
-                                                                      'prime_ext': False})
+    test_dict(HashDict, note='52load_factor', dict_creating_kwargs={'load_factor': 0.52,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
+
+    test_dict(HashDict, note='72load_factor', dict_creating_kwargs={'load_factor': 0.72,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
+
+    test_dict(HashDict, note='88load_factor', dict_creating_kwargs={'load_factor': 0.88,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
+
+    test_dict(HashDict, note='99load_factor', dict_creating_kwargs={'load_factor': 0.99,
+                                                                    'hash_function': hash,
+                                                                    'prime_ext': False})
 
     # test_dict(HashDict, note='prime_ext', dict_creating_kwargs={'load_factor': 0.72,
     #                                                            'hash_function': hash,
@@ -281,8 +336,16 @@ def test_hash_dict():
     #                                                                       'hash_function': hash,
     #                                                                       'prime_ext': True})
 
+    # test_dict(HashDict, note='bad_hash', dict_creating_kwargs={'load_factor': 0.72,
+    #                                                           'hash_function': lambda x: len(str(x)),
+    #                                                           'prime_ext': False})
 
-def test_dict(dictionary, note='', dict_creating_args=tuple(), dict_creating_kwargs=dict()):
+    # test_dict(HashDict, note='const_hash', dict_creating_kwargs={'load_factor': 0.72,
+    #                                                             'hash_function': lambda x: 1,
+    #                                                             'prime_ext': False})
+
+
+def test_dict(dictionary, note='', dict_creating_args=None, dict_creating_kwargs=None):
     warm_up(dictionary)
     if ADD:
         test_dict_method(dictionary, DATA_PATH, CURRENT_ADD_SAVE_PATH,
@@ -295,6 +358,10 @@ def test_dict(dictionary, note='', dict_creating_args=tuple(), dict_creating_kwa
 
 
 def main():
+    parser = create_parser()
+    parse_arguments(parser)
+    check_variables()
+
     try:
         import_data(DATA_PATH, SUMMARY)
     except EOFError:
